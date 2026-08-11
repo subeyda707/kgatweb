@@ -65,3 +65,23 @@ export async function getCleanRecords() {
   const live = await tryFetch('/records/clean');
   return live ? { data: live, live: true } : { data: [], live: false };
 }
+
+export async function importGraph(data) {
+  if (!API_BASE_URL) return { success: false, error: "No backend connected." };
+  try {
+    const res = await fetch(`${API_BASE_URL}/import`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ data }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.detail || `HTTP ${res.status}` };
+    }
+    const result = await res.json();
+    return { success: true, ...result };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
