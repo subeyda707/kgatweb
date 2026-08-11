@@ -9,6 +9,20 @@ const SAMPLE_RECORDS = [
 ];
 const SAMPLE_SUMMARY = { routine: 21, priority: 5, conflicts: 1, total: 26 };
 const SAMPLE_CONFLICTS = [{subject:"Ibuprofen", predicate:"treats", claims:[["kg_curator_2","Fever"],["kg_curator_1","Headache"],["admin_lead","HighCholesterol"]]}];
+const SAMPLE_GRAPH = {
+  nodes: ["Aspirin","Ibuprofen","Paracetamol","Metformin","Atorvastatin","Headache","Fever","Diabetes","HighCholesterol","MildPain","StomachIrritation","Nausea","Drowsiness","Cancer"],
+  edges: [
+    {source:"Aspirin", target:"Headache", label:"treats", flagged:false},
+    {source:"Aspirin", target:"StomachIrritation", label:"hasSideEffect", flagged:false},
+    {source:"Aspirin", target:"Cancer", label:"treats", flagged:true},
+    {source:"Ibuprofen", target:"Headache", label:"treats", flagged:true},
+    {source:"Ibuprofen", target:"Fever", label:"treats", flagged:true},
+    {source:"Ibuprofen", target:"HighCholesterol", label:"treats", flagged:true},
+    {source:"Metformin", target:"Diabetes", label:"treats", flagged:true},
+    {source:"Atorvastatin", target:"HighCholesterol", label:"treats", flagged:false},
+    {source:"Paracetamol", target:"Fever", label:"treats", flagged:false},
+  ],
+};
 
 async function tryFetch(path, options) {
   if (!API_BASE_URL) return null;
@@ -33,6 +47,10 @@ export async function getConflicts() {
   const live = await tryFetch('/conflicts');
   return live ? { data: live, live: true } : { data: SAMPLE_CONFLICTS, live: false };
 }
+export async function getGraph() {
+  const live = await tryFetch('/graph');
+  return live ? { data: live, live: true } : { data: SAMPLE_GRAPH, live: false };
+}
 export async function askChat(question, apiKey) {
   const live = await tryFetch('/chat', {
     method: 'POST',
@@ -41,4 +59,9 @@ export async function askChat(question, apiKey) {
   });
   if (live) return { answer: live.answer, live: true };
   return { answer: "No live backend connected -- set API_BASE_URL in src/config.js to enable real Gemini answers. This is sample mode.", live: false };
+}
+
+export async function getCleanRecords() {
+  const live = await tryFetch('/records/clean');
+  return live ? { data: live, live: true } : { data: [], live: false };
 }
