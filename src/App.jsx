@@ -9,6 +9,10 @@ import DataSource from './pages/DataSource';
 export default function App() {
   return (
     <div>
+      <div className="glow-bg">
+        <div className="glow-blob glow-1"></div>
+        <div className="glow-blob glow-2"></div>
+      </div>
       <nav className="topnav">
         <div className="brand"><span className="brand-dot"></span>KGAT</div>
         <div className="nav-links">
