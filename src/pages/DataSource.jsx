@@ -1,29 +1,53 @@
-import React from 'react';
-import { API_BASE_URL } from '../config';
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { importGraph } from '../api';
 
 export default function DataSource() {
+  const [status, setStatus] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef(null);
+  const navigate = useNavigate();
+
+  const handleFile = async (file) => {
+    setStatus({ loading: true });
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const result = await importGraph(parsed);
+      if (result.success) {
+        setStatus({ loading: false, success: true, count: result.triples_count });
+        setTimeout(() => navigate('/'), 1200);
+      } else {
+        setStatus({ loading: false, success: false, error: result.error });
+      }
+    } catch (e) {
+      setStatus({ loading: false, success: false, error: 'Could not parse this file as JSON.' });
+    }
+  };
+
   return (
     <div>
-      <h1>Data Source</h1>
-      <p className="subtitle">Where this audit trail's data comes from.</p>
+      <h1>Import</h1>
+      <p className="subtitle">Drop in any Knowledge Graph JSON — triples, or objects with flexible field names.</p>
 
-      <div className="card">
-        <h3>Backend connection</h3>
-        <p className="hint">
-          {API_BASE_URL
-            ? `Connected to: ${API_BASE_URL}`
-            : "No backend connected — showing realistic sample data. Set API_BASE_URL in src/config.js to connect a real backend (Colab, Render, or any server running the KGAT pipeline)."}
-        </p>
+      <div
+        className="upload-zone"
+        style={{ borderColor: dragging ? 'var(--violet)' : undefined }}
+        onClick={() => fileInput.current.click()}
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
+      >
+        <div className="upload-icon">⬆</div>
+        <p style={{fontSize:15, fontWeight:600, marginBottom:6}}>Drop a JSON file, or click to browse</p>
+        <p style={{fontSize:12.5, color:'var(--text-2)'}}>Accepts [subject, predicate, object] lists or flexible-key objects</p>
       </div>
+      <input ref={fileInput} type="file" accept=".json" style={{display:'none'}}
+             onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
 
-      <div className="card">
-        <h3>What the pipeline accepts</h3>
-        <p className="hint" style={{marginBottom:0}}>
-          Any Knowledge Graph data — a live Neo4j database, an uploaded JSON file in almost any shape,
-          or generated synthetic data. The audit logic doesn't care which source it came from; every
-          event goes through the same structural checks either way.
-        </p>
-      </div>
+      {status?.loading && <p style={{marginTop:16, color:'var(--text-2)', fontSize:13.5}}>Importing…</p>}
+      {status?.success && <p style={{marginTop:16, color:'var(--success)', fontSize:13.5}}>Imported {status.count} relationships — redirecting to Dashboard…</p>}
+      {status?.success === false && <p style={{marginTop:16, color:'var(--danger)', fontSize:13.5}}>{status.error}</p>}
     </div>
   );
 }
