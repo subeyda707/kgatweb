@@ -67,8 +67,7 @@ def chat(req: ChatRequest):
 
 @app.get("/graph")
 def graph():
-    """Real graph data -- every triple in the log, not just flagged ones,
-    so the visual reflects the actual Knowledge Graph, not just problems."""
+    """Real graph data -- every triple in the log, not just flagged ones."""
     log = _cache["log"] or generate_log()
     if _cache["log"] is None:
         _cache["log"] = log
@@ -83,3 +82,50 @@ def graph():
             "flagged": entry["request_id"] in flagged_ids,
         })
     return {"nodes": list(nodes), "edges": edges}
+
+class ImportRequest(BaseModel):
+    data: list
+
+def normalize_import(data):
+    normalized = []
+    s_keys = ['subject','source','entity','from']
+    p_keys = ['predicate','relation','relationship','type']
+    o_keys = ['object','target','value','to']
+    for item in data:
+        if isinstance(item, list) and len(item) >= 3:
+            normalized.append({"subject": str(item[0]), "predicate": str(item[1]), "object": str(item[2])})
+        elif isinstance(item, dict):
+            keys_lower = {k.lower(): k for k in item.keys()}
+            s = next((item[keys_lower[k]] for k in s_keys if k in keys_lower), None)
+            p = next((item[keys_lower[k]] for k in p_keys if k in keys_lower), None)
+            o = next((item[keys_lower[k]] for k in o_keys if k in keys_lower), None)
+            if s and p and o:
+                normalized.append({"subject": str(s), "predicate": str(p), "object": str(o)})
+    return normalized
+
+@app.post("/import")
+def import_graph(req: ImportRequest):
+    triples = normalize_import(req.data)
+    if not triples:
+        raise HTTPException(status_code=400, detail="Could not parse any valid triples from the uploaded data.")
+
+    import uuid
+    from datetime import datetime, timezone
+    from pipeline import issue_token
+
+    imported_log = []
+    agent_id = "external-import"
+    for t in triples:
+        imported_log.append({
+            "time": datetime.now(timezone.utc).isoformat(),
+            "level": "INFO", "component": "kgContent", "event_type": "added",
+            "msg": f"ADDED: ({t['subject']})-[{t['predicate']}]->({t['object']})",
+            "triple": t,
+            "user": {"username": agent_id, "roles": ["data_writer"]},
+            "request_id": str(uuid.uuid4()),
+            "token": issue_token(agent_id, "kg:write"),
+        })
+
+    _cache["log"] = imported_log
+    _cache["result"] = run_audit(imported_log)
+    return {"status": "imported", "triples_count": len(triples), "summary": _cache["result"]["summary"]}
